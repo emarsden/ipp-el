@@ -1,9 +1,9 @@
-;;; ipp.el --- implementation of the Internet Printing Protocol
+;;; ipp.el --- implementation of the Internet Printing Protocol  -*- lexical-binding: t -*-
 ;;;
-;;; Author: Eric Marsden <emarsden@laas.fr>
-;;; Version: 0.5
+;;; Author: Eric Marsden <eric.marsden@risk-engineering.org>
+;;; Version: 0.6
 ;;; Keywords: printing
-;;; Copyright: (C) 2001  Eric Marsden
+;;; Copyright: (C) 2001-2022  Eric Marsden
 ;;
 ;;     This program is free software; you can redistribute it and/or
 ;;     modify it under the terms of the GNU General Public License as
@@ -22,29 +22,37 @@
 ;;
 ;; The latest version of this package should be available from
 ;;
-;;     <URL:http://purl.org/net/emarsden/home/downloads/>
+;;     <https://github.com/emarsden/ipp-el>
+
+
+
 
 ;;; Commentary:
 
-;; The Internet Printing Protocol is intended to replace the LPD
-;; protocol for interacting with network printers. It specifies
-;; mechanisms for querying the capabilities of a printer, submitting
-;; and cancelling jobs, and queue monitoring.
+;; The Internet Printing Protocol (IPP) is intended to replace the LPD protocol
+;; for interacting with network printers. It specifies mechanisms for
+;; “driverless printing” (submitting and cancelling jobs), queue monitoring and
+;; querying printer capabilities. More recent versions of the standard are
+;; called “IPP Everywhere”.
 ;;
-;; You can find out whether a device is IPP-capable by trying to
-;; telnet to port 631. If it accepts the connection it probably
-;; understands IPP. You then need to discover the path component of
-;; the URI, for example by reading the documentation or from a driver
-;; program. Tested or reported to work on the following devices:
+;; You can find out whether a device is IPP-capable by trying to telnet to port
+;; 631. If it accepts the connection it probably understands IPP. You then need
+;; to discover the path component of the URI, for example by reading the
+;; documentation or from a driver program. Tested or reported to work on the
+;; following devices:
 ;;
 ;;   * Tektronix Phaser 750, with an URI of the form ipp://host:631/
 ;;     (empty path component)
 ;;
 ;;   * HP Laserjet 4000, with a path component of /ipp/port1.
 ;;
+;;   * HP Color LaserJet MFP M477fdw
+;;
+;;   * Lexmark E460dn, with an empty path component
+;;
 ;;   * Xerox Document Centre 460 ST, with empty path component.
 ;;
-;;   * CUPS printer spooler (see <URL:http://www.cups.org/>).
+;;   * CUPS printer spooler (see <http://www.cups.org/>).
 ;;
 ;;
 ;;
@@ -66,13 +74,13 @@
 ;; using simple marshalling rules.
 ;;
 ;; The Internet Printing Protocol is described in a number of RFCs:
-;;   <URL:http://www.faqs.org/rfcs/rfc2565.html>
-;;   <URL:http://www.faqs.org/rfcs/rfc2566.html>
-;;   <URL:http://www.faqs.org/rfcs/rfc2568.html>
+;;   <http://www.faqs.org/rfcs/rfc2565.html>
+;;   <http://www.faqs.org/rfcs/rfc2566.html>
+;;   <http://www.faqs.org/rfcs/rfc2568.html>
 ;;
 ;; and the Printer Working Group maintain a page at
 ;;
-;;   <URL:http://www.pwg.org/ipp/>
+;;   <https://www.pwg.org/ipp/>
 ;;
 ;;
 ;; Eventually it would be nice to modify the Emacs printing API to
@@ -82,18 +90,16 @@
 ;; similar to this one implementing the LPD protocol at the network
 ;; level; the LDP protocol is very simple).
 ;;
-;; See also printing.el at <URL:http://www.cpqd.br/~vinicius/emacs/>.
 ;;
-;;
-;; Thanks to Vinicius Jose Latorre for patches and Colin Marquardt and
-;; Andrew Cosgriff for help in debugging.
+;; Thanks to Vinicius Jose Latorre and Marc Grégoire for patches and to Colin
+;; Marquardt and Andrew Cosgriff for help in debugging.
 
 ;;; Code:
 
-(require 'cl)
+(require 'cl-lib)
 
 
-(defstruct ipp-reply
+(cl-defstruct ipp-reply
   status
   request-id
   attributes)
@@ -111,9 +117,9 @@
 into values host, port, path."
   (unless (string-match "^ipp://\\([^:]+\\):\\([0-9]+\\)/\\(.*\\)$" uri)
     (error "Invalid URI %s" uri))
-  (values (match-string 1 uri)
-          (string-to-number (match-string 2 uri))
-          (concat "/" (match-string 3 uri))))
+  (cl-values (match-string 1 uri)
+             (string-to-number (match-string 2 uri))
+             (concat "/" (match-string 3 uri))))
 
 ;; attribute = value-tag name-length name value-length value
 (defun ipp-demarshal-name-value (reply)
@@ -144,21 +150,21 @@ into values host, port, path."
           (t (error "unknown IPP attribute tag %s" tag)))))
 
 (defun ipp-demarshal-attributes (reply)
-  (loop while (ipp-demarshal-attribute reply)))
+  (cl-loop while (ipp-demarshal-attribute reply)))
 
 (defun ipp-demarshal-string (octets)
   (forward-char octets)
   (buffer-substring (- (point) octets) (point)))
 
 (defun ipp-demarshal-int (octets)
-  (do ((i octets (- i 1))
-       (accum 0))
+  (cl-do ((i octets (- i 1))
+          (accum 0))
       ((zerop i) accum)
     (setq accum (+ (* 256 accum) (char-after (point))))
     (forward-char)))
 
 (defun ipp-make-http-header (uri octets)
-  (multiple-value-bind (host port path)
+  (cl-multiple-value-bind (host port path)
       (ipp-parse-uri uri)
     (concat "POST " path " HTTP/1.1\r\n"
           (format "Host: %s:%s\r\n" host port)
@@ -213,8 +219,7 @@ into values host, port, path."
 
 (defmacro ipp-marshal-print-job-request (printer &rest body)
   `(let ((buf (get-buffer-create " *ipp-print-job*")))
-     (save-excursion
-       (set-buffer buf)
+     (with-current-buffer buf
        (erase-buffer)
        (insert (ipp-marshal-print-job-header ,printer))
        ,@body
@@ -232,15 +237,14 @@ into values host, port, path."
    (insert-buffer-substring buffer start end)))
 
 (defun ipp-open (printer-uri)
-  (multiple-value-bind (host port)
+  (cl-multiple-value-bind (host port)
       (ipp-parse-uri printer-uri)
     (let* ((buf (generate-new-buffer " *ipp connection*"))
            (proc (open-network-stream "ipp" buf host port)))
     (buffer-disable-undo buf)
-    (when (fboundp 'set-buffer-process-coding-system)
-      (save-excursion
-        (set-buffer buf)
-        (set-buffer-process-coding-system 'binary 'binary)
+    (when (fboundp 'set-process-coding-system)
+      (with-current-buffer buf
+        (set-process-coding-system proc 'binary 'binary)
         (set-buffer-multibyte nil)))
     proc)))
 
@@ -258,10 +262,9 @@ into values host, port, path."
         (reply (make-ipp-reply)))
     ;; wait for the connection to close
     (when (processp conn)
-      (loop until (eq (process-status conn) 'closed)
-            do (accept-process-output conn 5)))
-    (save-excursion
-      (set-buffer buf)
+      (cl-loop until (eq (process-status conn) 'closed)
+               do (accept-process-output conn 5)))
+    (with-current-buffer buf
       (goto-char (point-min))
       (when (re-search-forward "^HTTP/1.[01] 501" nil t)
         (error "Unimplemented IPP request"))
@@ -309,7 +312,7 @@ The printer name should be of the form ipp://host:631/ipp/port1."
 
 (defun ipp-print (printer content)
   "Print CONTENT to IPP-capable network device PRINTER.
-CONTENT must be in a format understood by your printer, so probably Postscript
+CONTENT must be in a format understood by your printer, such as PDF, Postscript
 or PCL.
 The printer name should be of the form ipp://host:631/ipp/port1."
   (let ((connection (ipp-open printer)))
@@ -322,7 +325,7 @@ The printer name should be of the form ipp://host:631/ipp/port1."
 ;;;###autoload
 (defun ipp-print-file (filename printer)
   "Print FILENAME to the IPP-capable network device PRINTER.
-FILENAME must be in a format understood by your printer, so probably Postscript
+FILENAME must be in a format understood by your printer, such as PDF, Postscript
 or PCL.
 The printer name should be of the form ipp://host:631/ipp/port1."
   (interactive "fIPP print file: \nsPrinter URI: ")
@@ -332,7 +335,7 @@ The printer name should be of the form ipp://host:631/ipp/port1."
 ;;;###autoload
 (defun ipp-print-region (buffer printer &optional start end)
   "Print BUFFER region from START to END to IPP-capable network device PRINTER.
-BUFFER must be in a format understood by your printer, so probably Postscript
+BUFFER must be in a format understood by your printer, such as PDF, Postscript
 or PCL.
 If START is nil, it defaults to beginning of BUFFER.
 If END is nil, it defaults to end of BUFFER.
@@ -344,7 +347,7 @@ The printer name should be of the form ipp://host:631/ipp/port1."
 ;;;###autoload
 (defun ipp-print-buffer (buffer printer)
   "Print BUFFER to IPP-capable network device PRINTER.
-BUFFER must be in a format understood by your printer, so probably Postscript
+BUFFER must be in a format understood by your printer, such as PDF, Postscript
 or PCL.
 The printer name should be of the form ipp://host:631/ipp/port1."
   (interactive "bIPP print buffer: \nsPrinter URI: ")
