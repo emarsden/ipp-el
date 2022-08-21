@@ -25,12 +25,11 @@
 ;;     <https://github.com/emarsden/ipp-el>
 
 
-
-
 ;;; Commentary:
 
-;; The Internet Printing Protocol (IPP) is intended to replace the LPD protocol
-;; for interacting with network printers. It specifies mechanisms for
+;; This Emacs package provides a partial implemention of the client component of
+;; the Internet Printing Protocol (IPP). IPP was intended to replace the LPD
+;; protocol for interacting with network printers. It specifies mechanisms for
 ;; “driverless printing” (submitting and cancelling jobs), queue monitoring and
 ;; querying printer capabilities. More recent versions of the standard are
 ;; called “IPP Everywhere”.
