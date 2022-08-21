@@ -1,13 +1,15 @@
-;;; ipp.el --- implementation of the Internet Printing Protocol  -*- lexical-binding: t -*-
+;;; ipp.el --- Implementation of the Internet Printing Protocol  -*- lexical-binding: t -*-
 ;;;
 ;;; Author: Eric Marsden <eric.marsden@risk-engineering.org>
-;;; Version: 0.6
-;;; Keywords: printing
 ;;; Copyright: (C) 2001-2022  Eric Marsden
+;;; Keywords: printing, hardware
+;;; URL: https://github.com/emarsden/ipp-el
+;;; Version: 0.6
+;;; Package-Requires: ((cl-lib "0.5") (emacs "24.1"))
 ;;
 ;;     This program is free software; you can redistribute it and/or
 ;;     modify it under the terms of the GNU General Public License as
-;;     published by the Free Software Foundation; either version 2 of
+;;     published by the Free Software Foundation; either version 3 of
 ;;     the License, or (at your option) any later version.
 ;;
 ;;     This program is distributed in the hope that it will be useful,
@@ -37,8 +39,8 @@
 ;; You can find out whether a device is IPP-capable by trying to telnet to port
 ;; 631. If it accepts the connection it probably understands IPP. You then need
 ;; to discover the path component of the URI, for example by reading the
-;; documentation or from a driver program. Tested or reported to work on the
-;; following devices:
+;; documentation or by analyzing DNS Service Discovery (Bonjour) network
+;; traffic. Tested or reported to work on the following devices:
 ;;
 ;;   * Tektronix Phaser 750, with an URI of the form ipp://host:631/
 ;;     (empty path component)
@@ -146,7 +148,7 @@ into values host, port, path."
           ((ipp-value-tag-p tag)
            (backward-char)
            (ipp-demarshal-name-value reply))
-          (t (error "unknown IPP attribute tag %s" tag)))))
+          (t (error "Unknown IPP attribute tag %s" tag)))))
 
 (defun ipp-demarshal-attributes (reply)
   (cl-loop while (ipp-demarshal-attribute reply)))
@@ -239,7 +241,7 @@ into values host, port, path."
   (cl-multiple-value-bind (host port)
       (ipp-parse-uri printer-uri)
     (let* ((buf (generate-new-buffer " *ipp connection*"))
-           (proc (open-network-stream "ipp" buf host port)))
+           (proc (open-network-stream "ipp" buf host port :type 'tls)))
     (buffer-disable-undo buf)
     (when (fboundp 'set-process-coding-system)
       (with-current-buffer buf
@@ -248,8 +250,8 @@ into values host, port, path."
     proc)))
 
 (defun ipp-close (connection)
-  ;; FIXME add delete-process
-  )
+  "Close the IPP connection CONNECTION."
+  (delete-process connection))
 
 (defun ipp-send (proc &rest args)
   (dolist (arg args)
