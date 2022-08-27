@@ -118,9 +118,10 @@
   (<= #x10 tag #xFF))
 
 (defun ipp-parse-uri (uri)
-  "Parse an URI of the form ipp://host:631/path or ipps://host:631/path
-into values HOST, PORT, TLS, PATH. TLS is true for an ipps URL (with encryption)
-and false otherwise. PORT defaults to 631 if not specified."
+  "Parse an IPP URI into values HOST, PORT, TLS, PATH.
+URI is of the form ipp://host:631/path or ipps://host:631/path.
+TLS is true for an ipps URL (with encryption) and false
+otherwise. PORT defaults to 631 if not specified."
   (unless (string-match "^ipp\\(s\\)?://\\([^:/]+\\)\\(:[0-9]+\\)?/\\(.*\\)$" uri)
     (error "Invalid URI %s" uri))
   (cl-values (match-string 2 uri)
@@ -189,7 +190,7 @@ and false otherwise. PORT defaults to 631 if not specified."
 ;; attribute = value-tag name-length name value-length value
 (defun ipp-demarshal-name-value (reply)
   (let (value-tag name-length name value-length value)
-    (setq value-tag (char-int (char-after (point))))
+    (setq value-tag (char-after (point)))
     (when (ipp-value-tag-p value-tag)
       (forward-char)
       (setq name-length (ipp-demarshal-int 2)
@@ -201,7 +202,7 @@ and false otherwise. PORT defaults to 631 if not specified."
 
 ;; see rfc2565 section 3.2
 (defun ipp-demarshal-attribute (reply)
-  (let ((tag (char-int (char-after (point)))))
+  (let ((tag (char-after (point))))
     (forward-char)
     (cond ((= tag 3)                    ; end-of-attributes-tag
            nil)
