@@ -992,10 +992,11 @@
       (setf (ipp-reply-status reply) (ipp-demarshal-int 2))
       (setf (ipp-reply-request-id reply) (ipp-demarshal-int 4))
       (ipp-demarshal-attributes reply)
-      reply)))
+      (message "IPP reply has %d attributes" (length (ipp-reply-attributes reply))))))
 
 
 (defun ipp-check-fixture (filename)
+  (message "IPP testing fixture %s" filename)
   (with-temp-buffer
     (set-buffer-multibyte nil)
     (insert-file-contents-literally filename)
@@ -1010,10 +1011,12 @@
       (setf (ipp-reply-status reply) (ipp-demarshal-int 2))
       (setf (ipp-reply-request-id reply) (ipp-demarshal-int 4))
       (ipp-demarshal-attributes reply)
-      reply)))
+      (message "IPP reply has %d attributes" (length (ipp-reply-attributes reply))))))
 
 (defun ipp-check-fixtures ()
-  (cl-loop for fixture in (directory-files "fixtures/")
-           do (check-fixture fixture)))
+  (cl-loop for fixture in (directory-files "fixtures" t)
+           when (and (file-readable-p fixture)
+                     (file-regular-p fixture))
+           do (ipp-check-fixture fixture)))
 
 
