@@ -216,7 +216,7 @@ and false otherwise. PORT defaults to 631 if not specified."
            t)
           (t (error "Unknown IPP attribute tag %s" tag)))))
 
-(defun mergeable-attribute-tag (tag)
+(defun ipp-mergeable-attribute-tag (tag)
   (member tag (list 33 35 48 50 65 66 68 69 70 71 72 73 74)))
 
 (defun ipp-demarshal-attributes (reply)
@@ -227,7 +227,7 @@ and false otherwise. PORT defaults to 631 if not specified."
 	(merged (list)))
     (while attributes
       (let ((next (pop attributes)))
-	(if (mergeable-attribute-tag (cl-third next))
+	(if (ipp-mergeable-attribute-tag (cl-third next))
 	    (let ((name (cl-first next))
 		  (current-tag (cl-third next))
 		  (enum (list)))
