@@ -4,7 +4,7 @@
 ;;; Copyright: (C) 2001-2022  Eric Marsden
 ;;; Keywords: printing, hardware
 ;;; URL: https://github.com/emarsden/ipp-el
-;;; Version: 0.6
+;;; Version: 0.7
 ;;; Package-Requires: ((cl-lib "0.5") (emacs "24.1"))
 ;;
 ;;     This program is free software; you can redistribute it and/or
@@ -61,20 +61,28 @@
 ;;
 ;;    (require 'ipp)
 ;;
-;; then try printing a file using 'M-x ipp-print'. This will prompt
-;; you for a file name (which should be in a format understood by the
-;; printer, such as Postscript), and the URI of the printer. There are
-;; also two functions for querying the capability of the device
-;; `ipp-get-attributes' and examining its queue `ipp-get-jobs'. Until
-;; I write display code for these functions you will have to call them
-;; from the *scratch* buffer with C-j to examine their return value.
+;; then try printing a file using 'M-x ipp-print'. This will prompt you for a
+;; file name (which should be in a format understood by the printer, such as
+;; PDF), and the URI of the printer. The URI should be of the form
+;;
+;;    ipp://10.0.0.1:631/ipp/port1   (unencrypted connection on port 631, path="/ipp/port1")
+;;    ipps://10.0.0.1/               (TLS connection on port 631, empty path component)
+;;
+;; There are also two functions for querying the capability of the device
+;; `ipp-get-attributes' and examining its queue `ipp-get-jobs'. Until I write
+;; display code for these functions you will have to call them from an IELM
+;; buffer to examine their return value.
+;;
+;;    ELISP> (ipp-get-attributes "ipps://127.0.0.1:631/")
 ;;
 ;;
-;; The IPP network protocol is based on HTTP/1.1 POST requests, using
-;; a special "application/ipp" MIME Content-Type. The data is encoded
+;; The IPP network protocol is based on HTTP/1.1 POST requests (or potentially
+;; using HTTP/2 in the most recent versions, though we do not support this),
+;; using a special "application/ipp" MIME Content-Type. The data is encoded
 ;; using simple marshalling rules.
 ;;
 ;; The Internet Printing Protocol is described in a number of RFCs:
+;;   <https://datatracker.ietf.org/doc/rfc8010/>
 ;;   <http://www.faqs.org/rfcs/rfc2565.html>
 ;;   <http://www.faqs.org/rfcs/rfc2566.html>
 ;;   <http://www.faqs.org/rfcs/rfc2568.html>
@@ -83,6 +91,7 @@
 ;;
 ;;   <https://www.pwg.org/ipp/>
 ;;
+;; See also <https://istopwg.github.io/ipp/ippguide.html>.
 ;;
 ;; Eventually it would be nice to modify the Emacs printing API to
 ;; support this type of direct printing, so that a user could set
@@ -105,22 +114,77 @@
   request-id
   attributes)
 
-(unless (fboundp 'char-int)
-  (fset 'char-int 'identity))
-
 (defun ipp-value-tag-p (tag)
-  (and (<= ?\x10 tag)
-       (<= tag ?\xFF)))
+  (<= #x10 tag #xFF))
 
-;; should really make the port optional defaulting to 631
 (defun ipp-parse-uri (uri)
-  "Parse an URI of the form ipp://host:631/ipp/port1
-into values host, port, path."
-  (unless (string-match "^ipp://\\([^:]+\\):\\([0-9]+\\)/\\(.*\\)$" uri)
+  "Parse an URI of the form ipp://host:631/path or ipps://host:631/path
+into values HOST, PORT, TLS, PATH. TLS is true for an ipps URL (with encryption)
+and false otherwise. PORT defaults to 631 if not specified."
+  (unless (string-match "^ipp\\(s\\)?://\\([^:/]+\\)\\(:[0-9]+\\)?/\\(.*\\)$" uri)
     (error "Invalid URI %s" uri))
-  (cl-values (match-string 1 uri)
-             (string-to-number (match-string 2 uri))
-             (concat "/" (match-string 3 uri))))
+  (cl-values (match-string 2 uri)
+             (if (match-string 3 uri)
+		 (string-to-number (substring (match-string 3 uri) 1))
+	         631)
+	     (if (match-string 1 uri) t nil)
+             (concat "/" (match-string 4 uri))))
+
+(defun ipp-demarshal-value (value-tag value-length)
+  (cl-case value-tag
+    ;; Unsupported
+    (#x10 (ipp-demarshal-string value-length))
+    ;; Unknown
+    (#x12 nil)
+    ;; NoValue
+    (#x13 nil)
+    ;; Integer
+    (#x21 (ipp-demarshal-int value-length))
+    ;; Boolean
+    (#x22 (eql (ipp-demarshal-int value-length) 1))
+    ;; Enum
+    (#x23 (ipp-demarshal-int value-length))
+    ;; DateTime, encoded as an OCTET-STRING consisting of eleven octets whose contents are defined
+    ;; by "DateAndTime" in RFC 1903
+    (#x31 (let ((year (ipp-demarshal-int 2))
+                (month (ipp-demarshal-int 1))
+                (day (ipp-demarshal-int 1))
+                (hour (ipp-demarshal-int 1))
+                (minutes (ipp-demarshal-int 1))
+                (seconds  (ipp-demarshal-int 1))
+                (_deci-seconds (ipp-demarshal-int 1))
+                (dir-utc (ipp-demarshal-string 1))
+                (hours-utc (ipp-demarshal-int 1))
+                (minutes-utc (ipp-demarshal-int 1)))
+            (format "%04d-%02d-%02dT%02d:%02d:%02d%s%02d:%02dZ"
+                    year month day
+                    hour minutes seconds
+                    dir-utc hours-utc minutes-utc)))
+    ;; The 'resolution' attribute syntax specifies a two-dimensional resolution in the indicated
+    ;; units. It consists of 3 values: a cross feed direction resolution (positive integer value), a
+    ;; feed direction resolution (positive integer value), and a units value.
+    ;;
+    ;; Encoding: OCTET-STRING consisting of nine octets of 2 SIGNED-INTEGERs followed by a
+    ;; SIGNED-BYTE. The first SIGNED-INTEGER contains the value of cross feed direction resolution.
+    ;; The second SIGNED-INTEGER contains the value of feed direction resolution. The SIGNED-BYTE
+    ;; contains the units, specified in terms of the printer MIB (RFC1903).
+    (#x32 (let ((xres (ipp-demarshal-int 4))
+                (yres (ipp-demarshal-int 4))
+                (_units (ipp-demarshal-int 1)))
+            (format "%dx%d" xres yres)))
+    ;; RangeOfInteger
+    (#x33 (ipp-demarshal-int value-length))
+    (#x37 (ipp-demarshal-string value-length))
+    ;; URI
+    (#x45 (ipp-demarshal-string value-length))
+    ;; Charset
+    (#x47 (ipp-demarshal-string value-length))
+    ;; NaturalLanguage
+    (#x48 (ipp-demarshal-string value-length))
+    ;; MimeMediaType
+    (#x49 (ipp-demarshal-string value-length))
+    (t (ipp-demarshal-string value-length))))
+
 
 ;; attribute = value-tag name-length name value-length value
 (defun ipp-demarshal-name-value (reply)
@@ -131,8 +195,9 @@ into values host, port, path."
       (setq name-length (ipp-demarshal-int 2)
             name (ipp-demarshal-string name-length)
             value-length (ipp-demarshal-int 2)
-            value (ipp-demarshal-string value-length))
-      (push (list name value value-tag) (ipp-reply-attributes reply)))))
+            value (ipp-demarshal-value value-tag value-length))
+      (when value
+	(push (list name value value-tag) (ipp-reply-attributes reply))))))
 
 ;; see rfc2565 section 3.2
 (defun ipp-demarshal-attribute (reply)
@@ -147,11 +212,34 @@ into values host, port, path."
           ;; we're still in *(attribute *additional-values)
           ((ipp-value-tag-p tag)
            (backward-char)
-           (ipp-demarshal-name-value reply))
+           (ipp-demarshal-name-value reply)
+           t)
           (t (error "Unknown IPP attribute tag %s" tag)))))
 
+(defun mergeable-attribute-tag (tag)
+  (member tag (list 33 35 48 50 65 66 68 69 70 71 72 73 74)))
+
 (defun ipp-demarshal-attributes (reply)
-  (cl-loop while (ipp-demarshal-attribute reply)))
+  (while (ipp-demarshal-attribute reply)
+    nil)
+  ;; merge any BegCollection/setOf name-value attributes
+  (let ((attributes (reverse (ipp-reply-attributes reply)))
+	(merged (list)))
+    (while attributes
+      (let ((next (pop attributes)))
+	(if (mergeable-attribute-tag (cl-third next))
+	    (let ((name (cl-first next))
+		  (current-tag (cl-third next))
+		  (enum (list)))
+	      (push (cl-second next) enum)
+	      (cl-loop for ea = (cl-first attributes)
+		       while (and ea (eql current-tag (cl-third ea)))
+		       do
+		       (push (cl-second ea) enum)
+		       (pop attributes))
+	      (push (list name enum current-tag) merged))
+	  (push next merged))))
+    (setf (ipp-reply-attributes reply) merged)))
 
 (defun ipp-demarshal-string (octets)
   (forward-char octets)
@@ -165,11 +253,14 @@ into values host, port, path."
     (forward-char)))
 
 (defun ipp-make-http-header (uri octets)
-  (cl-multiple-value-bind (host port path)
+  (cl-multiple-value-bind (host port _tls path)
       (ipp-parse-uri uri)
     (concat "POST " path " HTTP/1.1\r\n"
           (format "Host: %s:%s\r\n" host port)
           "Content-Type: application/ipp\r\n"
+          ;; We wait for the printer to close the connection before parsing the buffer contents
+          ;; (would be better to use the content-length)
+          "Connection: close\r\n"
           (format "Content-Length: %d\r\n" octets))))
 
 ;; a length is two octets
@@ -186,24 +277,24 @@ into values host, port, path."
 
 (defun ipp-marshal-printer-attributes-request (printer-uri)
   (concat (string 1 0)                  ; version as major/minor
-          (string 0 ?\xB)               ; operation-id
+          (string 0 #xB)                ; operation-id
           (string 0 0 0 ?e)             ; request-id as 4 octets
           (string 1)                    ; operation-attributes-tag
-          (ipp-attribute ?\x47 "attributes-charset" "utf-8")
-          (ipp-attribute ?\x48 "attributes-natural-language" "C")
-          (ipp-attribute ?\x45 "printer-uri" printer-uri)
-          (ipp-attribute ?\x42 "requesting-user-name" (user-login-name))
+          (ipp-attribute #x47 "attributes-charset" "utf-8")
+          (ipp-attribute #x48 "attributes-natural-language" "C")
+          (ipp-attribute #x45 "printer-uri" printer-uri)
+          (ipp-attribute #x42 "requesting-user-name" (user-login-name))
           (string 3)))                  ; end-of-attributes-tag
 
 (defun ipp-marshal-get-jobs-request (printer-uri)
   (concat (string 1 0)                  ; version as major/minor
-          (string 0 ?\xA)               ; operation-id
+          (string 0 #xA)                ; operation-id
           (string 0 0 0 ?e)             ; request-id as 4 octets
           (string 1)                    ; operation-attributes-tag
-          (ipp-attribute ?\x47 "attributes-charset" "utf-8")
-          (ipp-attribute ?\x48 "attributes-natural-language" "C")
-          (ipp-attribute ?\x45 "printer-uri" printer-uri)
-          (ipp-attribute ?\x42 "requesting-user-name" (user-login-name))
+          (ipp-attribute #x47 "attributes-charset" "utf-8")
+          (ipp-attribute #x48 "attributes-natural-language" "C")
+          (ipp-attribute #x45 "printer-uri" printer-uri)
+          (ipp-attribute #x42 "requesting-user-name" (user-login-name))
           (string 3)))                  ; end-of-attributes-tag
 
 (defun ipp-marshal-print-job-header (printer-uri)
@@ -211,11 +302,11 @@ into values host, port, path."
           (string 0 2)                  ; operation-id: 2 == print-job
           (string 0 0 0 ?e)             ; request-id as 4 octets
           (string 1)                    ; operation-attributes-tag
-          (ipp-attribute ?\x47 "attributes-charset" "utf-8")
-          (ipp-attribute ?\x48 "attributes-natural-language" "C")
-          (ipp-attribute ?\x45 "printer-uri" printer-uri)
-          (ipp-attribute ?\x42 "job-name" "My Fine Job")
-          (ipp-attribute ?\x42 "requesting-user-name" (user-login-name))
+          (ipp-attribute #x47 "attributes-charset" "utf-8")
+          (ipp-attribute #x48 "attributes-natural-language" "C")
+          (ipp-attribute #x45 "printer-uri" printer-uri)
+          (ipp-attribute #x42 "job-name" "My Fine Job")
+          (ipp-attribute #x42 "requesting-user-name" (user-login-name))
           (string 3)))                  ; end-of-attributes-tag
 
 (defmacro ipp-marshal-print-job-request (printer &rest body)
@@ -238,10 +329,11 @@ into values host, port, path."
    (insert-buffer-substring buffer start end)))
 
 (defun ipp-open (printer-uri)
-  (cl-multiple-value-bind (host port)
+  (cl-multiple-value-bind (host port tls)
       (ipp-parse-uri printer-uri)
     (let* ((buf (generate-new-buffer " *ipp connection*"))
-           (proc (open-network-stream "ipp" buf host port :type 'tls)))
+           (proc (if tls (open-network-stream "ipp" buf host port :type 'tls)
+		   (open-network-stream "ipp" buf host port))))
     (buffer-disable-undo buf)
     (when (fboundp 'set-process-coding-system)
       (with-current-buffer buf
@@ -252,6 +344,16 @@ into values host, port, path."
 (defun ipp-close (connection)
   "Close the IPP connection CONNECTION."
   (delete-process connection))
+
+;; Mostly for debugging use
+(defun ipp-kill-all-buffers ()
+  "Kill all buffers used for network connections with an IPP printer."
+  (interactive)
+  (cl-loop for buffer in (buffer-list)
+	   for name = (buffer-name buffer)
+	   when (and (> (length name) 16)
+		     (string= " *ipp connection*" (substring (buffer-name buffer) 0 17)))
+	   do (kill-buffer buffer)))
 
 (defun ipp-send (proc &rest args)
   (dolist (arg args)
@@ -271,19 +373,31 @@ into values host, port, path."
         (error "Unimplemented IPP request"))
       (goto-char (point-min))
       (when (re-search-forward "^HTTP/1.[01] 403" nil t)
-        (error "Access forbidden"))
+        (error "IPP request: access forbidden"))
       (goto-char (point-min))
       (if (search-forward "HTTP/1.1 100" nil t)
           (end-of-line 2)
         (goto-char (point-min)))
-      (unless (search-forward (string 13 10 13 10) nil t)
-        (error "Malformed IPP reply"))
-      (unless (looking-at (string 1 0))
-        (error "Unknown IPP protocol version"))
-      (forward-char 2)
-      (setf (ipp-reply-status reply) (ipp-demarshal-int 2))
-      (setf (ipp-reply-request-id reply) (ipp-demarshal-int 4))
-      (ipp-demarshal-attributes reply))
+      ;; skip over the HTTP headers
+      (goto-char (point-min))
+      (or (search-forward (string 13 10 13 10) nil t)
+          (progn
+            (goto-char (point-min))
+            (search-forward (string 10 10) nil t))
+          (error "Malformed IPP reply (skipping over HTTP header)"))
+      (let ((ipp-major-version (get-byte))
+            (ipp-minor-version (get-byte (1+ (point)))))
+        ;; We are not fully compliant with IPP version 1.1 and 2.0 (which for example require us to
+        ;; support HTTP chunked encoding), but we try our best.
+        (unless (member (cons ipp-major-version ipp-minor-version)
+                        (list (cons 1 0) (cons 1 1) (cons 2 0)))
+          (error "Unknown IPP protocol version %d.%d"
+                 ipp-major-version
+                 ipp-minor-version))
+	(forward-char 2)
+	(setf (ipp-reply-status reply) (ipp-demarshal-int 2))
+	(setf (ipp-reply-request-id reply) (ipp-demarshal-int 4))
+	(ipp-demarshal-attributes reply)))
     reply))
 
 (defun ipp-get (printer request)
@@ -294,8 +408,9 @@ The printer name should be of the form ipp://host:631/ipp/port1."
 	      (ipp-make-http-header printer (length request))
 	      "\r\n"
 	      request)
-    (ipp-decode-reply connection)
-    (ipp-close connection)))
+    (let ((response (ipp-decode-reply connection)))
+      (ipp-close connection)
+      response)))
 
 ;; these are not autoloaded, since they need some sort of widget-based
 ;; interface to present the information.

@@ -6,10 +6,10 @@ Protocol (IPP). IPP was intended to replace the LPD protocol for interacting wit
 It specifies mechanisms for “driverless printing” (submitting and cancelling jobs), queue monitoring
 and querying printer capabilities. More recent versions of the standard are called “IPP Everywhere”.
 
-You can find out whether a device is IPP-capable by trying to telnet to port
-631. If it accepts the connection it probably understands IPP. You then need to discover the path
-component of the URI, for example by reading the documentation or from a driver program. Tested or
-reported to work on the following devices:
+You can find out whether a device is IPP-capable by trying to telnet to port 631. If it accepts the
+connection it probably understands IPP. You then need to discover the path component of the URI, for
+example by reading the documentation or from a driver program. Tested or reported to work on the
+following devices:
 
 - Tektronix Phaser 750, with an URI of the form ipp://host:631/ (empty path component)
 
@@ -26,18 +26,28 @@ reported to work on the following devices:
 
 ## Usage
 
-Load this package by putting in your `~/.emacs.el`
+Load this package by putting in your `~/.emacs.el` initialization file
 
-   (require 'ipp)
+    (require 'ipp)
 
 then try printing a file using `M-x ipp-print`. This will prompt you for a file name (which should
-be in a format understood by the printer, such as Postscript), and the URI of the printer. There are
-also two functions for querying the capability of the device `ipp-get-attributes` and examining its
-queue `ipp-get-jobs`. Until I write display code for these functions you will have to call them from
-the `*scratch*` buffer with `C-j` to examine their return value.
+be in a format understood natively by the printer, such as PDF), and the URI of the printer. The URI
+should be of the form
 
-The IPP network protocol is based on HTTP/1.1 POST requests, using a dedicated "application/ipp" MIME
+    ipp://10.0.0.1:631/ipp/port1   (unencrypted connection on port 631, path="/ipp/port1")
+    ipps://10.0.0.1/               (TLS connection on port 631, empty path component)
+
+There are also two functions for querying the capability of the device (`ipp-get-attributes`) and
+examining its queue (`ipp-get-jobs`). Until I write display code for these functions you will have to
+call them from an IELM buffer to examine their return value.
+
+    ELISP> (ipp-get-attributes "ipps://127.0.0.1:631/")
+
+The IPP network protocol is based on HTTP/1.1 POST requests (or potentially using HTTP/2 in the most
+recent versions, though we do not support this), using a special `application/ipp` MIME
 Content-Type. The data is encoded using simple marshalling rules.
+
+
 
 The Internet Printing Protocol is described in
 [RFC 8011](https://www.rfc-editor.org/rfc/rfc8011.html), and previously RFC numbers 3382, 3381,
