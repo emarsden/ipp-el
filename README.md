@@ -1,5 +1,6 @@
 # ipp.el -- Emacs Lisp implementation of the Internet Printing Protocol
 
+[![MELPA](https://melpa.org/packages/ipp-badge.svg)](https://melpa.org/#/ipp)
 
 This Emacs package provides a partial implemention of the client component of the Internet Printing
 Protocol (IPP). IPP was intended to replace the LPD protocol for interacting with network printers.
@@ -24,13 +25,27 @@ following devices:
 - [CUPS printer spooler](https://www.cups.org/).
 
 
-## Usage
+## Installation
 
-Load this package by putting in your `~/.emacs.el` initialization file
+Install via the [MELPA package archive](https://melpa.org/partials/getting-started.html) by
+including the following in your Emacs initialization file (`.emacs.el` or `init.el`):
+
+    (require 'package)
+    (add-to-list 'package-archives '("melpa" . "https://stable.melpa.org/packages/") t)
+
+then saying 
+
+     M-x install-package RET ipp
+
+To install manually, place the file `ipp.el` in a directory on your `load-path` and add the
+following to your Emacs initialization file:
 
     (require 'ipp)
 
-then try printing a file using `M-x ipp-print`. This will prompt you for a file name (which should
+
+## Usage
+
+Print a file using `M-x ipp-print`. This will prompt you for a file name (which should
 be in a format understood natively by the printer, such as PDF), and the URI of the printer. The URI
 should be of the form
 
@@ -48,6 +63,8 @@ recent versions, though we do not support this), using a special `application/ip
 Content-Type. The data is encoded using simple marshalling rules.
 
 
+
+## Background
 
 The Internet Printing Protocol is described in
 [RFC 8011](https://www.rfc-editor.org/rfc/rfc8011.html), and previously RFC numbers 3382, 3381,
