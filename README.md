@@ -11,16 +11,28 @@ and querying printer capabilities. More recent versions of the standard are call
 
 You can find out whether a device is IPP-capable by trying to telnet to port 631. If it accepts the
 connection it probably understands IPP. You then need to discover the path component of the URI, for
-example by reading the documentation or from a driver program. Tested or reported to work on the
-following devices:
+example by reading the documentation, by looking through the menus via the front panel or the
+printer's HTTP interface, or by analyzing DNS Service Discovery (Bonjour) network traffic.
 
-- Tektronix Phaser 750, with an URI of the form ipp://host:631/ (empty path component)
+Tested with or reported to work on the following devices:
 
-- HP Laserjet 4000, with a path component of /ipp/port1.
+- Tektronix Phaser 750, with an URI of the form "ipp://host:631/" (empty path component)
+
+- TOSHIBA e-STUDIO3005A, with an URI of the form "ipp://host:631/" (empty path component)
+
+- HP Laserjet 4000, with a path component of "/ipp/port1"
 
 - HP Color LaserJet MFP M477fdw
 
 - Lexmark E460dn, with an empty path component
+
+- Lexmark MS312dn with a path component of "/ipp/print" (IPP URI of the form
+  "ipp://10.0.0.1:631/ipp/print" or "ipps://10.0.0.1:443/ipp/print")
+
+- Xerox Document Centre 460 ST, with empty path component.
+
+- Epson AL-MX300 and AL-M310DN with a path component of "/Epson_IPP_Printer" (IPP URI of the form
+  "ipp://10.0.0.1/Epson_IPP_Printer" or "ipps://10.0.0.1:443/Epson_IPP_Printer")
 
 - Xerox Document Centre 460 ST, with empty path component.
 
