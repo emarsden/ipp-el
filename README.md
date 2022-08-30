@@ -1,6 +1,8 @@
 # ipp.el -- Emacs Lisp implementation of the Internet Printing Protocol
 
 [![MELPA](https://melpa.org/packages/ipp-badge.svg)](https://melpa.org/#/ipp)
+[![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](http://www.gnu.org/licenses/gpl-3.0)
+
 
 This Emacs package provides a partial implemention of the client component of the Internet Printing
 Protocol (IPP). IPP was intended to replace the LPD protocol for interacting with network printers.
