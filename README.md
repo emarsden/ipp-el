@@ -16,9 +16,9 @@ printer's HTTP interface, or by analyzing DNS Service Discovery (Bonjour) networ
 
 Tested with or reported to work on the following devices:
 
-- Tektronix Phaser 750, with an URI of the form "ipp://host:631/" (empty path component)
+- Tektronix Phaser 750, with a URI of the form "ipp://host:631/" (empty path component)
 
-- TOSHIBA e-STUDIO3005A, with an URI of the form "ipp://host:631/" (empty path component)
+- TOSHIBA e-STUDIO3005A, with a URI of the form "ipp://host:631/" (empty path component)
 
 - HP Laserjet 4000, with a path component of "/ipp/port1"
 
@@ -72,13 +72,12 @@ call them from an IELM buffer to examine their return value.
 
     ELISP> (ipp-get-attributes "ipps://127.0.0.1:631/")
 
-The IPP network protocol is based on HTTP/1.1 POST requests (or potentially using HTTP/2 in the most
-recent versions, though we do not support this), using a special `application/ipp` MIME
-Content-Type. The data is encoded using simple marshalling rules.
-
-
 
 ## Background
+
+The IPP network protocol is based on HTTP/1.1 POST requests (or potentially HTTP/2 in the most
+recent versions, though this library does not support it), using a special `application/ipp` MIME
+Content-Type. The data is encoded using simple marshalling rules.
 
 The Internet Printing Protocol is described in
 [RFC 8011](https://www.rfc-editor.org/rfc/rfc8011.html), and previously RFC numbers 3382, 3381,
@@ -90,7 +89,7 @@ The Internet Printing Protocol is described in
 Eventually it would be nice to modify the Emacs printing API to support this type of direct
 printing, so that a user could set `ps-printer-name` to "ipp://modern-printer:631/" or
 "lpd://ancient-printer/queue" (it would be easy to write a package similar to this one implementing
-the LPD protocol at the network level; the LDP protocol is very simple).
+the LPD protocol at the network level; the LPD protocol is very simple).
 
 Thanks to Vinicius Jose Latorre and Marc Grégoire for patches and to Colin Marquardt and Andrew
 Cosgriff for help in debugging.
