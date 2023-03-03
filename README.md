@@ -29,7 +29,9 @@ Tested with or reported to work on the following devices:
 - Lexmark MS312dn with a path component of "/ipp/print" (IPP URI of the form
   "ipp://10.0.0.1:631/ipp/print" or "ipps://10.0.0.1:443/ipp/print")
 
-- Xerox Document Centre 460 ST, with empty path component.
+- Brother DCP-1610W, with an empty path component
+
+- Xerox Document Centre 460 ST, with empty path component
 
 - Epson AL-MX300 and AL-M310DN with a path component of "/Epson_IPP_Printer" (IPP URI of the form
   "ipp://10.0.0.1/Epson_IPP_Printer" or "ipps://10.0.0.1:443/Epson_IPP_Printer")
