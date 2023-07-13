@@ -68,6 +68,10 @@ should be of the form
     ipp://10.0.0.1:631/ipp/port1   (unencrypted connection on port 631, path="/ipp/port1")
     ipps://10.0.0.1/               (TLS connection on port 631, empty path component)
 
+You can specify a default value for the printer URI by customizing variable `ipp-default-printer`:
+
+    `M-x customize-group RET ipp-printing RET`
+
 There are also two functions for querying the capability of the device (`ipp-get-attributes`) and
 examining its queue (`ipp-get-jobs`). Until I write display code for these functions you will have to
 call them from an IELM buffer to examine their return value.
