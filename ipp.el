@@ -1,10 +1,10 @@
 ;;; ipp.el --- Implementation of the Internet Printing Protocol  -*- lexical-binding: t -*-
 ;;;
 ;;; Author: Eric Marsden <eric.marsden@risk-engineering.org>
-;;; Copyright: (C) 2001-2022  Eric Marsden
+;;; Copyright: (C) 2001-2023  Eric Marsden
 ;;; Keywords: printing, hardware
 ;;; URL: https://github.com/emarsden/ipp-el
-;;; Version: 0.7
+;;; Version: 0.8
 ;;; Package-Requires: ((cl-lib "0.5") (emacs "24.1"))
 ;;
 ;;     This program is free software; you can redistribute it and/or
@@ -120,6 +120,19 @@
 
 (require 'cl-lib)
 
+(defgroup ipp-printing nil
+  "IPP Printing group."
+  :tag "IPP Printing"
+  :link '(emacs-library-link :tag "Source Lisp File" "ipp.el")
+  :prefix "ipp-"
+  :group 'comm)
+
+(defcustom ipp-default-printer nil
+  "Default value for the IPP printer preselected when calling `ipp-print'.
+Examples: ipp://hostname:631/path or https://192.168.1.10:631/ipp/port."
+  :type '(string)
+  :group 'ipp-printing)
+
 
 (cl-defstruct ipp-reply
   status
@@ -135,7 +148,7 @@ URI is of the form ipp://host:631/path or ipps://host:631/path.
 TLS is true for an ipps URL (with encryption) and false
 otherwise. PORT defaults to 631 if not specified."
   (unless (string-match "^ipp\\(s\\)?://\\([^:/]+\\)\\(:[0-9]+\\)?/\\(.*\\)$" uri)
-    (error "Invalid URI %s" uri))
+    (error "Invalid URI for IPP printer %s" uri))
   (cl-values (match-string 2 uri)
              (if (match-string 3 uri)
 		 (string-to-number (substring (match-string 3 uri) 1))
@@ -457,18 +470,21 @@ The printer name should be of the form ipp://host:631/ipp/port1."
 FILENAME must be in a format understood by your printer, such as PDF, Postscript
 or PCL.
 The printer name should be of the form ipp://host:631/ipp/port1."
-  (interactive "fIPP print file: \nsPrinter URI: ")
+  (interactive
+   (list
+    (expand-file-name (read-file-name "IPP print file: "))
+    (read-string "Printer URI: " ipp-default-printer nil ipp-default-printer)))
   (ipp-print printer
 	     (ipp-marshal-print-job-request-file printer filename)))
 
 ;;;###autoload
 (defun ipp-print-region (buffer printer &optional start end)
   "Print BUFFER region from START to END to IPP-capable network device PRINTER.
-BUFFER must be in a format understood by your printer, such as PDF, Postscript
+BUFFER contents must be in a format understood by your printer, such as PDF, Postscript
 or PCL.
 If START is nil, it defaults to beginning of BUFFER.
 If END is nil, it defaults to end of BUFFER.
-The printer name should be of the form ipp://host:631/ipp/port1."
+The PRINTER URI should be of the form ipp://host:631/ipp/port1."
   (interactive "bIPP print buffer (region): \nsPrinter URI: ")
   (ipp-print printer
 	     (ipp-marshal-print-job-request-region printer buffer start end)))
@@ -476,10 +492,13 @@ The printer name should be of the form ipp://host:631/ipp/port1."
 ;;;###autoload
 (defun ipp-print-buffer (buffer printer)
   "Print BUFFER to IPP-capable network device PRINTER.
-BUFFER must be in a format understood by your printer, such as PDF, Postscript
+BUFFER contents must be in a format understood by your printer, such as PDF, Postscript
 or PCL.
 The printer name should be of the form ipp://host:631/ipp/port1."
-  (interactive "bIPP print buffer: \nsPrinter URI: ")
+  (interactive
+   (list
+    (read-buffer "IPP print buffer region: ")
+    (read-string "Printer URI: " ipp-default-printer nil ipp-default-printer)))
   (ipp-print-region buffer printer))
 
 
