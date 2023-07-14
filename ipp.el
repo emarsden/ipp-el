@@ -128,9 +128,9 @@
   :group 'comm)
 
 (defcustom ipp-default-printer nil
-  "Default value for the IPP printer preselected when calling `ipp-print'.
+  "If non-nil, the default value for the IPP printer preselected when calling `ipp-print'.
 Examples: ipp://hostname:631/path or https://192.168.1.10:631/ipp/port."
-  :type '(string)
+  :type '(choice string (const nil))
   :group 'ipp-printing)
 
 
