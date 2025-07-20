@@ -2,8 +2,7 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](http://www.gnu.org/licenses/gpl-3.0)
 [![MELPA](https://melpa.org/packages/ipp-badge.svg)](https://melpa.org/#/ipp)
-[![Latest tagged version](https://img.shields.io/github/v/tag/emarsden/ipp?label=Latest%20tagged%20version)](https://github.com/emarsden/ipp/)
-
+[![Latest tagged version](https://img.shields.io/github/v/tag/emarsden/ipp-el?label=Latest%20tagged%20version)](https://github.com/emarsden/ipp-el/)
 
 
 This Emacs package provides a partial implemention of the client component of the [Internet Printing
@@ -92,8 +91,8 @@ call them from an IELM buffer to examine their return value.
 ## Background
 
 The IPP network protocol is based on HTTP/1.1 POST requests (or potentially HTTP/2 in the most
-recent versions, though this library does not support it), using a special `application/ipp` MIME
-Content-Type. The data is encoded using simple marshalling rules.
+recent versions), using a special `application/ipp` MIME Content-Type. The data is encoded using
+simple marshalling rules.
 
 The Internet Printing Protocol is described in
 [RFC 8011](https://www.rfc-editor.org/rfc/rfc8011.html), and previously RFC numbers 3382, 3381,
