@@ -119,6 +119,8 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'bindat)
+
 
 (defgroup ipp-printing nil
   "IPP Printing group."
@@ -138,6 +140,8 @@ Examples: ipp://hostname:631/path or https://192.168.1.10:631/ipp/port."
   :type 'string
   :group 'ipp-printing)
 
+
+(defvar ipp--request-id 42)
 
 (cl-defstruct ipp-reply
   status
@@ -309,7 +313,8 @@ otherwise. PORT defaults to 631 if not specified."
 (defun ipp-marshal-printer-attributes-request (printer-uri)
   (concat (string 1 0)                  ; version as major/minor
           (string 0 #xB)                ; operation-id
-          (string 0 0 0 ?e)             ; request-id as 4 octets
+          ;; request-id as 4 octets
+          (bindat-pack (bindat-type sint 32 nil) (cl-incf ipp--request-id))
           (string 1)                    ; operation-attributes-tag
           (ipp-attribute #x47 "attributes-charset" "utf-8")
           (ipp-attribute #x48 "attributes-natural-language" "C")
@@ -320,7 +325,8 @@ otherwise. PORT defaults to 631 if not specified."
 (defun ipp-marshal-get-jobs-request (printer-uri)
   (concat (string 1 0)                  ; version as major/minor
           (string 0 #xA)                ; operation-id
-          (string 0 0 0 ?e)             ; request-id as 4 octets
+          ;; request-id as 4 octets
+          (bindat-pack (bindat-type sint 32 nil) (cl-incf ipp--request-id))
           (string 1)                    ; operation-attributes-tag
           (ipp-attribute #x47 "attributes-charset" "utf-8")
           (ipp-attribute #x48 "attributes-natural-language" "C")
@@ -331,7 +337,8 @@ otherwise. PORT defaults to 631 if not specified."
 (defun ipp-marshal-print-job-header (printer-uri)
   (concat (string 1 0)                  ; version as major/minor
           (string 0 2)                  ; operation-id: 2 == print-job
-          (string 0 0 0 ?e)             ; request-id as 4 octets
+          ;; request-id as 4 octets
+          (bindat-pack (bindat-type sint 32 nil) (cl-incf ipp--request-id))
           (string 1)                    ; operation-attributes-tag
           (ipp-attribute #x47 "attributes-charset" "utf-8")
           (ipp-attribute #x48 "attributes-natural-language" "C")
