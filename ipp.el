@@ -1,10 +1,10 @@
 ;;; ipp.el --- Implementation of the Internet Printing Protocol  -*- lexical-binding: t -*-
 ;;;
 ;;; Author: Eric Marsden <eric.marsden@risk-engineering.org>
-;;; Copyright: (C) 2001-2023  Eric Marsden
+;;; Copyright: (C) 2001-2025  Eric Marsden
 ;;; Keywords: printing, hardware
 ;;; URL: https://github.com/emarsden/ipp-el
-;;; Version: 0.8
+;;; Version: 0.9
 ;;; Package-Requires: ((cl-lib "0.5") (emacs "24.1"))
 ;;
 ;;     This program is free software; you can redistribute it and/or
@@ -34,7 +34,7 @@
 ;; protocol for interacting with network printers. It specifies mechanisms for
 ;; “driverless printing” (submitting and cancelling jobs), queue monitoring and
 ;; querying printer capabilities. More recent versions of the standard are
-;; called “IPP Everywhere”.
+;; called “IPP Everywhere”. We implement IPP/1.0 (RFC2566).
 ;;
 ;; You can find out whether a device is IPP-capable by trying to telnet to port 631. If it
 ;; accepts the connection it probably understands IPP. You then need to discover the path
@@ -69,7 +69,7 @@
 ;;
 ;;
 ;;
-;; Usage: load this package by putting in your ~/.emacs.el
+;; Usage: load this package by putting in your Emacs initialization file
 ;;
 ;;    (require 'ipp)
 ;;
@@ -131,6 +131,11 @@
   "If non-nil, the default value for the IPP printer preselected when calling `ipp-print'.
 Examples: ipp://hostname:631/path or https://192.168.1.10:631/ipp/port."
   :type '(choice string (const nil))
+  :group 'ipp-printing)
+
+(defcustom ipp-user-name (user-login-name)
+  "The user name to use in submitted IPP print jobs."
+  :type 'string
   :group 'ipp-printing)
 
 
@@ -309,7 +314,7 @@ otherwise. PORT defaults to 631 if not specified."
           (ipp-attribute #x47 "attributes-charset" "utf-8")
           (ipp-attribute #x48 "attributes-natural-language" "C")
           (ipp-attribute #x45 "printer-uri" printer-uri)
-          (ipp-attribute #x42 "requesting-user-name" (user-login-name))
+          (ipp-attribute #x42 "requesting-user-name" ipp-user-name)
           (string 3)))                  ; end-of-attributes-tag
 
 (defun ipp-marshal-get-jobs-request (printer-uri)
@@ -320,7 +325,7 @@ otherwise. PORT defaults to 631 if not specified."
           (ipp-attribute #x47 "attributes-charset" "utf-8")
           (ipp-attribute #x48 "attributes-natural-language" "C")
           (ipp-attribute #x45 "printer-uri" printer-uri)
-          (ipp-attribute #x42 "requesting-user-name" (user-login-name))
+          (ipp-attribute #x42 "requesting-user-name" ipp-user-name)
           (string 3)))                  ; end-of-attributes-tag
 
 (defun ipp-marshal-print-job-header (printer-uri)
@@ -331,8 +336,9 @@ otherwise. PORT defaults to 631 if not specified."
           (ipp-attribute #x47 "attributes-charset" "utf-8")
           (ipp-attribute #x48 "attributes-natural-language" "C")
           (ipp-attribute #x45 "printer-uri" printer-uri)
-          (ipp-attribute #x42 "job-name" "My Fine Job")
-          (ipp-attribute #x42 "requesting-user-name" (user-login-name))
+          (ipp-attribute #x42 "job-name" "ipp.el print job")
+          (ipp-attribute #x42 "requesting-user-name" ipp-user-name)
+          ;; could include document-format and job-k-octets attributes
           (string 3)))                  ; end-of-attributes-tag
 
 (defmacro ipp-marshal-print-job-request (printer &rest body)
@@ -360,12 +366,12 @@ otherwise. PORT defaults to 631 if not specified."
     (let* ((buf (generate-new-buffer " *ipp connection*"))
            (proc (if tls (open-network-stream "ipp" buf host port :type 'tls)
 		   (open-network-stream "ipp" buf host port))))
-    (buffer-disable-undo buf)
-    (when (fboundp 'set-process-coding-system)
-      (with-current-buffer buf
-        (set-process-coding-system proc 'binary 'binary)
-        (set-buffer-multibyte nil)))
-    proc)))
+      (buffer-disable-undo buf)
+      (when (fboundp 'set-process-coding-system)
+        (with-current-buffer buf
+          (set-process-coding-system proc 'binary 'binary)
+          (set-buffer-multibyte nil)))
+      proc)))
 
 (defun ipp-close (connection)
   "Close the IPP connection CONNECTION."
