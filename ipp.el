@@ -4,7 +4,7 @@
 ;;; Copyright: (C) 2001-2025  Eric Marsden
 ;;; Keywords: printing, hardware
 ;;; URL: https://github.com/emarsden/ipp-el
-;;; Version: 0.9
+;;; Version: 0.8
 ;;; Package-Requires: ((cl-lib "0.5") (emacs "24.1"))
 ;;
 ;;     This program is free software; you can redistribute it and/or
@@ -120,6 +120,7 @@
 
 (require 'cl-lib)
 (require 'bindat)
+(require 'plz)
 
 
 (defgroup ipp-printing nil
@@ -287,17 +288,6 @@ otherwise. PORT defaults to 631 if not specified."
     (setq accum (+ (* 256 accum) (char-after (point))))
     (forward-char)))
 
-(defun ipp-make-http-header (uri octets)
-  (cl-multiple-value-bind (host port _tls path)
-      (ipp-parse-uri uri)
-    (concat "POST " path " HTTP/1.1\r\n"
-          (format "Host: %s:%s\r\n" host port)
-          "Content-Type: application/ipp\r\n"
-          ;; We wait for the printer to close the connection before parsing the buffer contents
-          ;; (would be better to use the content-length)
-          "Connection: close\r\n"
-          (format "Content-Length: %d\r\n" octets))))
-
 ;; a length is two octets
 (defun ipp-length (str)
   (let ((octets (length str)))
@@ -367,23 +357,6 @@ otherwise. PORT defaults to 631 if not specified."
    printer
    (insert-buffer-substring buffer start end)))
 
-(defun ipp-open (printer-uri)
-  (cl-multiple-value-bind (host port tls)
-      (ipp-parse-uri printer-uri)
-    (let* ((buf (generate-new-buffer " *ipp connection*"))
-           (proc (if tls (open-network-stream "ipp" buf host port :type 'tls)
-		   (open-network-stream "ipp" buf host port))))
-      (buffer-disable-undo buf)
-      (when (fboundp 'set-process-coding-system)
-        (with-current-buffer buf
-          (set-process-coding-system proc 'binary 'binary)
-          (set-buffer-multibyte nil)))
-      proc)))
-
-(defun ipp-close (connection)
-  "Close the IPP connection CONNECTION."
-  (delete-process connection))
-
 ;; Mostly for debugging use
 (defun ipp-kill-all-buffers ()
   "Kill all buffers used for network connections with an IPP printer."
@@ -394,62 +367,38 @@ otherwise. PORT defaults to 631 if not specified."
 		     (string= " *ipp connection*" (substring (buffer-name buffer) 0 17)))
 	   do (kill-buffer buffer)))
 
-(defun ipp-send (proc &rest args)
-  (dolist (arg args)
-    (process-send-string proc arg)
-    (accept-process-output)))
-
-(defun ipp-decode-reply (conn)
-  (let ((buf (if (bufferp conn) conn (process-buffer conn)))
-        (reply (make-ipp-reply)))
-    ;; wait for the connection to close
-    (when (processp conn)
-      (cl-loop until (eq (process-status conn) 'closed)
-               do (accept-process-output conn 5)))
-    (with-current-buffer buf
-      (goto-char (point-min))
-      (when (re-search-forward "^HTTP/1.[01] 501" nil t)
-        (error "Unimplemented IPP request"))
-      (goto-char (point-min))
-      (when (re-search-forward "^HTTP/1.[01] 403" nil t)
-        (error "IPP request: access forbidden"))
-      (goto-char (point-min))
-      (if (search-forward "HTTP/1.1 100" nil t)
-          (end-of-line 2)
-        (goto-char (point-min)))
-      ;; skip over the HTTP headers
-      (goto-char (point-min))
-      (or (search-forward (string 13 10 13 10) nil t)
-          (progn
-            (goto-char (point-min))
-            (search-forward (string 10 10) nil t))
-          (error "Malformed IPP reply (skipping over HTTP header)"))
-      (let ((ipp-major-version (get-byte))
-            (ipp-minor-version (get-byte (1+ (point)))))
-        ;; We are not fully compliant with IPP version 1.1 and 2.0 (which for example require us to
-        ;; support HTTP chunked encoding), but we try our best.
-        (unless (member (cons ipp-major-version ipp-minor-version)
-                        (list (cons 1 0) (cons 1 1) (cons 2 0)))
-          (error "Unknown IPP protocol version %d.%d"
-                 ipp-major-version
-                 ipp-minor-version))
-	(forward-char 2)
-	(setf (ipp-reply-status reply) (ipp-demarshal-int 2))
-	(setf (ipp-reply-request-id reply) (ipp-demarshal-int 4))
-	(ipp-demarshal-attributes reply)))
+;; operates on current buffer
+(defun ipp-decode-body ()
+  (let ((reply (make-ipp-reply))
+        (ipp-major-version (get-byte))
+        (ipp-minor-version (get-byte (1+ (point)))))
+    ;; We are not fully compliant with IPP version 1.1 and 2.0 (which for example require us to
+    ;; support HTTP chunked encoding), but we try our best.
+    (unless (member (cons ipp-major-version ipp-minor-version)
+                    (list (cons 1 0) (cons 1 1) (cons 2 0)))
+      (error "Unknown IPP protocol version %d.%d"
+             ipp-major-version
+             ipp-minor-version))
+    (forward-char 2)
+    (setf (ipp-reply-status reply) (ipp-demarshal-int 2))
+    (setf (ipp-reply-request-id reply) (ipp-demarshal-int 4))
+    (ipp-demarshal-attributes reply)
     reply))
 
-(defun ipp-get (printer request)
-  "Get REQUEST from IPP-capable network device PRINTER.
-The printer name should be of the form ipp://host:631/ipp/port1."
-  (let ((connection (ipp-open printer)))
-    (ipp-send connection
-	      (ipp-make-http-header printer (length request))
-	      "\r\n"
-	      request)
-    (let ((response (ipp-decode-reply connection)))
-      (ipp-close connection)
-      response)))
+(defun ipp-get (printer-uri request)
+  ;; curl doesn't accept the ipp:// or ipps:// URL scheme
+  (let ((massaged-uri (cond ((string-prefix-p "ipp://" printer-uri)
+                             (concat "http://" (cl-subseq printer-uri 6)))
+                            ((string-prefix-p "ipps://" printer-uri)
+                             (concat "https://" (cl-subseq printer-uri 7)))
+                            (t
+                             (error "Not an IPP URL: %s" printer-uri)))))
+    (plz 'post massaged-uri
+      :headers '(("Content-Type" . "application/ipp")
+                 ("Connection" . "close"))
+      :body request
+      :body-type 'binary
+      :as #'ipp-decode-body)))
 
 ;; these are not autoloaded, since they need some sort of widget-based
 ;; interface to present the information.
@@ -470,12 +419,7 @@ The printer name should be of the form ipp://host:631/ipp/port1."
 CONTENT must be in a format understood by your printer, such as PDF, Postscript
 or PCL.
 The printer name should be of the form ipp://host:631/ipp/port1."
-  (let ((connection (ipp-open printer)))
-    (ipp-send connection
-	      (ipp-make-http-header printer (length content))
-	      "\r\n"
-	      content)
-    (ipp-close connection)))
+  (ipp-get printer content))
 
 ;;;###autoload
 (defun ipp-print-file (filename printer)
