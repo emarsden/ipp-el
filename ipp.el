@@ -5,7 +5,7 @@
 ;;; Keywords: printing, hardware
 ;;; URL: https://github.com/emarsden/ipp-el
 ;;; Version: 0.8
-;;; Package-Requires: ((cl-lib "0.5") (emacs "24.1"))
+;;; Package-Requires: ((cl-lib "0.5") (plz "0.9") (emacs "28.1"))
 ;;
 ;;     This program is free software; you can redistribute it and/or
 ;;     modify it under the terms of the GNU General Public License as
