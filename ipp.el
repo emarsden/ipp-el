@@ -436,17 +436,17 @@ The printer name should be of the form ipp://host:631/ipp/port1."
 
 (defun ipp-print (printer content)
   "Print CONTENT to IPP-capable network device PRINTER.
-CONTENT must be in a format understood by your printer, such as PDF, Postscript
-or PCL.
-The printer name should be of the form ipp://host:631/ipp/port1."
+CONTENT must be in a format understood by your printer, such as PDF,
+Postscript or PCL. The printer name should be of the form
+ipp://host:631/ipp/port1."
   (ipp-get printer content))
 
 ;;;###autoload
 (defun ipp-print-file (filename printer)
   "Print FILENAME to the IPP-capable network device PRINTER.
-FILENAME must be in a format understood by your printer, such as PDF, Postscript
-or PCL.
-The printer name should be of the form ipp://host:631/ipp/port1."
+FILENAME must be in a format understood by your printer, such as PDF,
+Postscript or PCL. The printer name should be of the form
+ipp://host:631/ipp/port1."
   (interactive
    (list
     (expand-file-name (read-file-name "IPP print file: "))
@@ -457,11 +457,10 @@ The printer name should be of the form ipp://host:631/ipp/port1."
 ;;;###autoload
 (defun ipp-print-region (buffer printer &optional start end)
   "Print BUFFER region from START to END to IPP-capable device PRINTER.
-BUFFER contents must be in a format understood by your printer, such as PDF,
-Postscript or PCL.
-If START is nil, it defaults to beginning of BUFFER.
-If END is nil, it defaults to end of BUFFER.
-The PRINTER URI should be of the form ipp://host:631/ipp/port1."
+BUFFER contents must be in a format understood by your printer, such as
+PDF, Postscript or PCL. If START is nil, it defaults to beginning of
+BUFFER. If END is nil, it defaults to end of BUFFER. The PRINTER URI
+should be of the form ipp://host:631/ipp/port1."
   (interactive "bIPP print buffer (region): \nsPrinter URI: ")
   (ipp-print printer
 	     (ipp-marshal-print-job-request-region printer buffer start end)))
@@ -469,9 +468,9 @@ The PRINTER URI should be of the form ipp://host:631/ipp/port1."
 ;;;###autoload
 (defun ipp-print-buffer (buffer printer)
   "Print BUFFER to IPP-capable network device PRINTER.
-BUFFER contents must be in a format understood by your printer, such as PDF,
-Postscript or PCL.
-The printer name should be of the form ipp://host:631/ipp/port1."
+BUFFER contents must be in a format understood by your printer, such as
+PDF, Postscript or PCL. The printer name should be of the form
+ipp://host:631/ipp/port1."
   (interactive
    (list
     (read-buffer "IPP print buffer region: ")
