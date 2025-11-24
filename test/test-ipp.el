@@ -6,6 +6,8 @@
 
 
 (require 'cl-lib)
+(require 'ipp)
+
 
 ;; Get-Printer-Attributes output from the HP OfficeJet Pro 8730 (IPP 2.0)
 (defvar *get-printer-attributes*
@@ -1014,7 +1016,7 @@
       (message "IPP reply has %d attributes" (length (ipp-reply-attributes reply))))))
 
 (defun ipp-check-fixtures ()
-  (cl-loop for fixture in (directory-files "fixtures" t)
+  (cl-loop for fixture in (directory-files "test/fixtures" t)
            when (and (file-readable-p fixture)
                      (file-regular-p fixture))
            do (ipp-check-fixture fixture)))
