@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9] - Unreleased
+
+- New user-customizable variables `ipp-user-agent`, `ipp-connect-timeout` and `ipp-request-timeout`.
+
+
+
 ## [0.8] - 2025-07-20
 
 - Use the plz library to make HTTP requests via curl (falling back to the url.el support built into

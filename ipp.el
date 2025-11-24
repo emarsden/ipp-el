@@ -5,7 +5,7 @@
 ;;; Keywords: printing, hardware
 ;;; URL: https://github.com/emarsden/ipp-el
 ;;; Version: 0.8
-;;; Package-Requires: ((cl-lib "0.5") (plz "0.9") (emacs "28.1"))
+;;; Package-Requires: ((plz "0.9") (emacs "28.1"))
 ;;
 ;;     This program is free software; you can redistribute it and/or
 ;;     modify it under the terms of the GNU General Public License as
@@ -131,7 +131,7 @@
   :group 'comm)
 
 (defcustom ipp-default-printer nil
-  "If non-nil, the default value for the IPP printer preselected when calling `ipp-print'.
+  "If non-nil, the default IPP printer preselected when calling `ipp-print'.
 Examples: ipp://hostname:631/path or https://192.168.1.10:631/ipp/port."
   :type '(choice string (const nil))
   :group 'ipp-printing)
@@ -139,6 +139,21 @@ Examples: ipp://hostname:631/path or https://192.168.1.10:631/ipp/port."
 (defcustom ipp-user-name (user-login-name)
   "The user name to use in submitted IPP print jobs."
   :type 'string
+  :group 'ipp-printing)
+
+(defcustom ipp-user-agent "ipp.el"
+  "The User-Agent header to send in IPP requests."
+  :type 'string
+  :group 'ipp-printing)
+
+(defcustom ipp-connect-timeout 20.0
+  "Timeout in seconds when connecting to an IPP server."
+  :type 'float
+  :group 'ipp-printing)
+
+(defcustom ipp-request-timeout 30.0
+  "Timeout in seconds for requests sent to an IPP server."
+  :type 'float
   :group 'ipp-printing)
 
 
@@ -180,6 +195,8 @@ otherwise. PORT defaults to 631 if not specified."
     (#x22 (eql (ipp-demarshal-int value-length) 1))
     ;; Enum
     (#x23 (ipp-demarshal-int value-length))
+    ;; String
+    (#x30 (ipp-demarshal-string value-length))
     ;; DateTime, encoded as an OCTET-STRING consisting of eleven octets whose contents are defined
     ;; by "DateAndTime" in RFC 1903
     (#x31 (let ((year (ipp-demarshal-int 2))
@@ -395,7 +412,10 @@ otherwise. PORT defaults to 631 if not specified."
                              (error "Not an IPP URL: %s" printer-uri)))))
     (plz 'post massaged-uri
       :headers '(("Content-Type" . "application/ipp")
+                 ("User-agent" . ipp-user-agent)
                  ("Connection" . "close"))
+      :connect-timeout ipp-connect-timeout
+      :timeout ipp-request-timeout
       :body request
       :body-type 'binary
       :as #'ipp-decode-body)))
@@ -436,9 +456,9 @@ The printer name should be of the form ipp://host:631/ipp/port1."
 
 ;;;###autoload
 (defun ipp-print-region (buffer printer &optional start end)
-  "Print BUFFER region from START to END to IPP-capable network device PRINTER.
-BUFFER contents must be in a format understood by your printer, such as PDF, Postscript
-or PCL.
+  "Print BUFFER region from START to END to IPP-capable device PRINTER.
+BUFFER contents must be in a format understood by your printer, such as PDF,
+Postscript or PCL.
 If START is nil, it defaults to beginning of BUFFER.
 If END is nil, it defaults to end of BUFFER.
 The PRINTER URI should be of the form ipp://host:631/ipp/port1."
@@ -449,8 +469,8 @@ The PRINTER URI should be of the form ipp://host:631/ipp/port1."
 ;;;###autoload
 (defun ipp-print-buffer (buffer printer)
   "Print BUFFER to IPP-capable network device PRINTER.
-BUFFER contents must be in a format understood by your printer, such as PDF, Postscript
-or PCL.
+BUFFER contents must be in a format understood by your printer, such as PDF,
+Postscript or PCL.
 The printer name should be of the form ipp://host:631/ipp/port1."
   (interactive
    (list
